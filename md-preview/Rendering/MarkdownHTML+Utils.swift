@@ -183,7 +183,8 @@ nonisolated extension MarkdownHTML {
     /// JavaScript expression for the element a `#fragment` link points to:
     /// a literal `id` first (footnotes carry real ids), then a GitHub-style
     /// heading slug, since headings only get synthetic `md-heading-N` ids.
-    /// Shared by the app and Quick Look so both resolve links the same way.
+    /// An empty fragment or `top` with no match is the top of the page, as
+    /// in a browser. Shared by the app and Quick Look so both resolve links the same way.
     static func fragmentTargetScript(id: String) -> String {
         """
         (() => {
@@ -196,15 +197,21 @@ nonisolated extension MarkdownHTML {
                 .trim()
                 .replace(/[^\\p{L}\\p{N}\\s_-]/gu, '')
                 .replace(/\\s/g, '-');
+            // Same suffixing as GitHub: `Foo`, `Foo`, `Foo-1` are
+            // `foo`, `foo-1`, `foo-1-1`.
             const seen = new Map();
             for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,h6')) {
-                let slug = slugify(heading.textContent || '');
-                const count = seen.get(slug) || 0;
-                seen.set(slug, count + 1);
-                if (count > 0) slug = slug + '-' + count;
+                const base = slugify(heading.textContent || '');
+                let slug = base;
+                if (seen.has(slug)) {
+                    let count = seen.get(base);
+                    do { count += 1; slug = base + '-' + count; } while (seen.has(slug));
+                    seen.set(base, count);
+                }
+                seen.set(slug, 0);
                 if (slug === wanted) return heading;
             }
-            return null;
+            return wanted === '' || wanted === 'top' ? document.documentElement : null;
         })()
         """
     }

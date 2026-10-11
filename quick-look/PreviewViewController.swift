@@ -670,15 +670,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
 
     /// The page is `about:blank`, so `#x` links resolve to `about:blank#x`.
     /// WebKit can hand that over with the `#` percent-encoded
-    /// (`about:blank%23x`), which leaves `URL.fragment` nil.
-    static func pageFragment(of url: URL) -> String? {
+    /// (`about:blank%23x`), which leaves `URL.fragment` nil. Returns an
+    /// empty string for a bare `#` link.
+    nonisolated static func pageFragment(of url: URL) -> String? {
         let string = url.absoluteString
-        for prefix in ["about:blank#", "about:blank%23"] where string.hasPrefix(prefix) {
-            let fragment = String(string.dropFirst(prefix.count))
-            let decoded = fragment.removingPercentEncoding ?? fragment
-            return decoded.isEmpty ? nil : decoded
-        }
-        return nil
+        guard let prefix = ["about:blank#", "about:blank%23"].first(where: string.hasPrefix) else { return nil }
+        let fragment = String(string.dropFirst(prefix.count))
+        return fragment.removingPercentEncoding ?? fragment
     }
 
     func webView(

@@ -44,7 +44,7 @@ final class QuickLookLinkNavigationTests: XCTestCase {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("ql-headings-\(UUID().uuidString).md")
         let filler = String(repeating: "Filler paragraph.\n\n", count: 200)
         try """
-        [Bottom](#bottom-of-this-document) [Repeat](#repeat-1) [Missing](#no-such-heading)
+        [Bottom](#bottom-of-this-document) [Repeat](#repeat-1) [Missing](#no-such-heading) [Top](#) [Repeat 1](#repeat-1-1)
 
         \(filler)
 
@@ -53,6 +53,10 @@ final class QuickLookLinkNavigationTests: XCTestCase {
         \(filler)
 
         ## Repeat
+
+        \(filler)
+
+        ## Repeat-1
 
         \(filler)
 
@@ -91,9 +95,19 @@ final class QuickLookLinkNavigationTests: XCTestCase {
             }
             XCTAssertEqual(top ?? .infinity, 0, accuracy: 1, "Link \(index) should scroll heading \(headingIndex) to the top")
         }
-        try await click(0, landsOn: 2)
+        try await click(0, landsOn: 3)
         try await click(1, landsOn: 1)
         try await click(2, landsOn: nil)
+        try await click(4, landsOn: 2)
+        // A bare `#` goes back to the top, like in a browser.
+        _ = try await view.evaluateJavaScript("window.scrollTo(0, 2000); document.querySelectorAll('article a')[3].click(); true")
+        let topDeadline = Date().addingTimeInterval(3)
+        var scrollY = try await view.evaluateJavaScript("window.scrollY") as? Double
+        while (scrollY ?? 1) > 0, Date() < topDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+            scrollY = try await view.evaluateJavaScript("window.scrollY") as? Double
+        }
+        XCTAssertEqual(scrollY, 0)
         XCTAssertTrue(opened.isEmpty, "Fragment links must stay in the preview, got \(opened)")
         XCTAssertEqual(view.url?.absoluteString, "about:blank")
     }
@@ -102,7 +116,7 @@ final class QuickLookLinkNavigationTests: XCTestCase {
         XCTAssertEqual(PreviewViewController.pageFragment(of: try XCTUnwrap(URL(string: "about:blank#intro"))), "intro")
         XCTAssertEqual(PreviewViewController.pageFragment(of: try XCTUnwrap(URL(string: "about:blank%23intro"))), "intro")
         XCTAssertEqual(PreviewViewController.pageFragment(of: try XCTUnwrap(URL(string: "about:blank#caf%C3%A9"))), "café")
-        XCTAssertNil(PreviewViewController.pageFragment(of: try XCTUnwrap(URL(string: "about:blank#"))))
+        XCTAssertEqual(PreviewViewController.pageFragment(of: try XCTUnwrap(URL(string: "about:blank#"))), "")
         XCTAssertNil(PreviewViewController.pageFragment(of: try XCTUnwrap(URL(string: "about:srcdoc#intro"))))
         XCTAssertNil(PreviewViewController.pageFragment(of: try XCTUnwrap(URL(string: "https://example.com/#intro"))))
     }

@@ -991,30 +991,12 @@ final class MarkdownWebView: NSView, WKNavigationDelegate {
         }
     }
 
-    /// Document-Y offset for a link fragment: literal `id` match first
-    /// (footnotes carry real ids), then GitHub-style heading slugs, since
-    /// headings only get synthetic `md-heading-N` ids.
+    /// Document-Y offset for a link fragment, found by
+    /// `MarkdownHTML.fragmentTargetScript(id:)`.
     func elementOffset(id: String, completion: @escaping (CGFloat?) -> Void) {
         let script = """
         (() => {
-            const target = \(javaScriptStringLiteral(id));
-            let el = document.getElementById(target);
-            if (!el) {
-                const wanted = target.toLowerCase();
-                const slugify = (text) => text
-                    .toLowerCase()
-                    .trim()
-                    .replace(/[^\\p{L}\\p{N}\\s_-]/gu, '')
-                    .replace(/\\s/g, '-');
-                const seen = new Map();
-                for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,h6')) {
-                    let slug = slugify(heading.textContent || '');
-                    const count = seen.get(slug) || 0;
-                    seen.set(slug, count + 1);
-                    if (count > 0) slug = slug + '-' + count;
-                    if (slug === wanted) { el = heading; break; }
-                }
-            }
+            const el = \(MarkdownHTML.fragmentTargetScript(id: id));
             if (!el) return null;
             const rect = el.getBoundingClientRect();
             return rect.top + (window.scrollY || document.documentElement.scrollTop || 0);

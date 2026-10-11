@@ -180,6 +180,35 @@ nonisolated extension MarkdownHTML {
         return String(json.dropFirst().dropLast())
     }
 
+    /// JavaScript expression for the element a `#fragment` link points to:
+    /// a literal `id` first (footnotes carry real ids), then a GitHub-style
+    /// heading slug, since headings only get synthetic `md-heading-N` ids.
+    /// Shared by the app and Quick Look so both resolve links the same way.
+    static func fragmentTargetScript(id: String) -> String {
+        """
+        (() => {
+            const target = \(javaScriptStringLiteral(id));
+            const el = document.getElementById(target);
+            if (el) return el;
+            const wanted = target.toLowerCase();
+            const slugify = (text) => text
+                .toLowerCase()
+                .trim()
+                .replace(/[^\\p{L}\\p{N}\\s_-]/gu, '')
+                .replace(/\\s/g, '-');
+            const seen = new Map();
+            for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,h6')) {
+                let slug = slugify(heading.textContent || '');
+                const count = seen.get(slug) || 0;
+                seen.set(slug, count + 1);
+                if (count > 0) slug = slug + '-' + count;
+                if (slug === wanted) return heading;
+            }
+            return null;
+        })()
+        """
+    }
+
     private final class MarkdownHTMLBundleToken {}
 
     static func firstMatch(of regex: NSRegularExpression,
